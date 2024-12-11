@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Color Palette{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <h1>Color Palette</h1>
+            <img src="data:image/png;base64,{{ palette_image }}" class="img-fluid" alt="Color Palette">
+        </div>
+        <div>
+            <h1>Uploaded Image</h1>
+            <img src="{{ uploaded_image_url }}" class="img-thumbnail" alt="Uploaded Image" style="width: 300px; height: 300px; ;margin-top: 25px;">
+        </div>
+    </div>
+    <h2 class="mt-4">RGB Codes</h2>
+    <ul class="list-group">
+        {% for code in rgb_codes %}
+            <li class="list-group-item">
+                {{ code }}
+                <button class="btn btn-sm btn-outline-secondary float-right" onclick="copyToClipboard('{{ code }}')">Copy</button>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'home' %}" class="btn btn-secondary mt-4">Back to Home</a>
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied to clipboard: ' + text);
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+    </script>
+{% endblock %}

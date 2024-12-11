@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Upload an Image</h1>
+    <form method="POST" enctype="multipart/form-data" class="mb-4">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+    <h2>Your Palettes</h2>
+    <div class="row">
+        {% for palette in palettes %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <img src="{{ palette.palette_image.url }}" class="card-img-top" alt="Palette Image">
+                    <div class="card-body">
+                        <a href="{% url 'edit_palette' palette.id %}" class="btn btn-warning">Edit</a>
+                        <a href="{% url 'delete_palette' palette.id %}" class="btn btn-danger">Delete</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}
