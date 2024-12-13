@@ -3,24 +3,49 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Upload an Image</h1>
-    <form method="POST" enctype="multipart/form-data" class="mb-4">
+    <h1 class="mb-4">Process an Image</h1>
+    <form method="POST" enctype="multipart/form-data" action="{% url 'process_image' %}" class="mb-4">
         {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Upload</button>
+        <div class="form-group">
+            <label for="image">Image:</label>
+            <input type="file" id="image" name="image" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="k_value">Number of Colors (k):</label>
+            <input 
+                type="number" 
+                id="k_value" 
+                name="k" 
+                value="5" 
+                min="1" 
+                max="10" 
+                class="form-control w-25">
+        </div>
+        <button type="submit" class="btn btn-primary">Apply</button>
     </form>
+
     <h2>Your Palettes</h2>
-    <div class="row">
-        {% for palette in palettes %}
-            <div class="col-md-4 mb-4">
-                <div class="card">
-                    <img src="{{ palette.palette_image.url }}" class="card-img-top" alt="Palette Image">
-                    <div class="card-body">
-                        <a href="{% url 'edit_palette' palette.id %}" class="btn btn-warning">Edit</a>
-                        <a href="{% url 'delete_palette' palette.id %}" class="btn btn-danger">Delete</a>
+    <div class="container">
+        <div class="row">
+            {% for palette in palettes %}
+                <div class="col-md-4 mb-4 d-flex align-items-stretch">
+                    <div class="card" style="width: 100%; height: 100%;">
+                        <img src="{{ palette.image.image.url }}" class="card-img-top" alt="Uploaded Image" style="height: 200px; object-fit: cover;">
+                        <div class="card-body">
+                            <!-- Palette Colors -->
+                            <div class="d-flex mb-2">
+                                {% for color in palette.rgb_colors %}
+                                    <div style="width: 30px; height: 30px; background-color: {{ color }}; margin-right: 5px; border: 1px solid #000;"></div>
+                                {% endfor %}
+                            </div>
+                            <div class="text-center">
+                                <a href="{% url 'edit_palette' palette.id %}" class="btn btn-warning">Edit</a>
+                                <a href="{% url 'delete_palette' palette.id %}" class="btn btn-danger">Delete</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        {% endfor %}
+            {% endfor %}
+        </div>
     </div>
 {% endblock %}

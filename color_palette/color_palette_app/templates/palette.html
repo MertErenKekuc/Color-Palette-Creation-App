@@ -4,25 +4,41 @@
 
 {% block content %}
     <div class="d-flex justify-content-between align-items-start">
+        <!-- Renk Paleti -->
         <div>
             <h1>Color Palette</h1>
-            <img src="data:image/png;base64,{{ palette_image }}" class="img-fluid" alt="Color Palette">
+            <div class="d-flex" style="border: 1px solid #ddd; padding: 10px;">
+                {% for hex_code in rgb_codes %}
+                    <div 
+                        style="background-color: {{ hex_code }}; width: 100px; height: 100px; margin-right: 5px;">
+                    </div>
+                {% endfor %}
+            </div>
         </div>
+
+        <!-- Yüklenen Görüntü -->
         <div>
             <h1>Uploaded Image</h1>
-            <img src="{{ uploaded_image_url }}" class="img-thumbnail" alt="Uploaded Image" style="width: 300px; height: 300px; ;margin-top: 25px;">
+            <img src="{{ uploaded_image_url }}" class="img-thumbnail" alt="Uploaded Image" 
+                style="width: 300px; height: 300px; margin-top: 25px;">
         </div>
     </div>
+
+    <!-- RGB Kodları -->
     <h2 class="mt-4">RGB Codes</h2>
     <ul class="list-group">
-        {% for code in rgb_codes %}
+        {% for hex_code in rgb_codes %}
             <li class="list-group-item">
-                {{ code }}
-                <button class="btn btn-sm btn-outline-secondary float-right" onclick="copyToClipboard('{{ code }}')">Copy</button>
+                {{ hex_code }}
+                <button class="btn btn-sm btn-outline-secondary float-right" onclick="copyToClipboard('{{ hex_code }}')">Copy</button>
             </li>
         {% endfor %}
     </ul>
+
+    <!-- Ana Sayfaya Dön Butonu -->
     <a href="{% url 'home' %}" class="btn btn-secondary mt-4">Back to Home</a>
+
+    <!-- Kopyalama Fonksiyonu -->
     <script>
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(function() {
