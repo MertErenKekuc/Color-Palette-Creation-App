@@ -30,23 +30,32 @@ def convert_to_lab(image):
     return cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 
 def apply_kmeans(image, k=5):
+    # LAB renk uzayında K-means uygulaması
     pixels = image.reshape((-1, 3))
-    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans = KMeans(n_clusters=k, random_state=42, max_iter=500)
     kmeans.fit(pixels)
-    return np.uint8(kmeans.cluster_centers_)
+    return kmeans.cluster_centers_
+
 
 def lab_to_rgb(centroids):
-    return cv2.cvtColor(np.uint8([centroids]), cv2.COLOR_LAB2RGB)[0]
+    # LAB renk uzayını RGB'ye doğru bir şekilde dönüştürme
+    lab_image = np.uint8([centroids])
+    rgb_image = cv2.cvtColor(lab_image, cv2.COLOR_LAB2RGB)
+    return rgb_image[0]
 
 def visualize_palette(colors):
-    fig, ax = plt.subplots(figsize=(8, 4))
-    hex_codes = []
-    for i, color in enumerate(colors):
-        hex_color = '#{:02x}{:02x}{:02x}'.format(int(color[0]), int(color[1]), int(color[2]))
-        hex_codes.append(hex_color)
-        ax.add_patch(plt.Rectangle((i, 0), 1, 1, color=np.array(color) / 255))
-    ax.axis('off')
-    return fig, hex_codes
+    # Palet görselleştirme
+    palette_width = 100 * len(colors)
+    palette_height = 100
+    palette_image = np.zeros((palette_height, palette_width, 3), dtype=np.uint8)
+
+    for idx, color in enumerate(colors):
+        start_x = idx * 100
+        end_x = start_x + 100
+        color = np.clip(color, 0, 255)  # Renk değerlerini sınırla
+        palette_image[:, start_x:end_x, :] = color
+
+    return palette_image
 
 @login_required
 def home(request):
@@ -70,50 +79,42 @@ def home(request):
 def process_image(request):
     if request.method == 'POST':
         try:
-            # Görüntüyü al
             uploaded_image = request.FILES.get('image')
             if not uploaded_image:
                 return render(request, 'error.html', {'error': 'No image provided.'})
 
-            # Kullanıcıdan gelen k değerini al
-            k = int(request.POST.get('k', 5))
-
-            # Görüntüyü kaydet
+            k = int(request.POST.get('k', 5))  # Kullanıcıdan alınan `k` değeri
             image_instance = ImageUpload.objects.create(image=uploaded_image)
-
-            # İşleme başla
             image_path = image_instance.image.path
+
+            # Görüntü işleme
             img_resized = load_and_resize_image(image_path)
-            img_blurred = apply_gaussian_blur(img_resized)
-            img_lab = convert_to_lab(img_blurred)
+            img_lab = convert_to_lab(img_resized)
             centroids_lab = apply_kmeans(img_lab, k)
             centroids_rgb = lab_to_rgb(centroids_lab)
 
-            # Renk paletini görselleştirme
-            fig, rgb_codes = visualize_palette(centroids_rgb)
-            buffer = BytesIO()
-            FigureCanvas(fig).print_png(buffer)
-            buffer.seek(0)
-            image_png = buffer.getvalue()
-            buffer.close()
+            # Paleti görsel olarak oluştur
+            palette_image = visualize_palette(centroids_rgb)
 
-            # Paleti kaydetme
-            fs = FileSystemStorage()
-            palette_image_path = f'palettes/palette_{image_instance.id}.png'
-            filename = fs.save(palette_image_path, BytesIO(image_png))
-            palette_image_url = fs.url(filename)
+            # Görseli dosyaya kaydet
+            palette_path = f'media/palettes/palette_{image_instance.id}.png'
+            cv2.imwrite(palette_path, cv2.cvtColor(palette_image, cv2.COLOR_RGB2BGR))
+
+            # Renk kodlarını oluştur
+            rgb_codes = ['#{:02x}{:02x}{:02x}'.format(int(c[0]), int(c[1]), int(c[2])) for c in centroids_rgb]
+            rgb_code_string = '|'.join(rgb_codes)
 
             # Veritabanına kaydet
-            rgb_code_string = '|'.join([f"{color}" for color in rgb_codes])
             ColorPalette.objects.create(
                 user=request.user,
                 image=image_instance,
-                palette_image=filename,
-                rgb_codes=rgb_code_string
+                palette_image=f'palettes/palette_{image_instance.id}.png',
+                rgb_codes=rgb_code_string,
+                k_value=k  # Burada `k` değerini kaydediyoruz
             )
 
             return render(request, 'palette.html', {
-                'palette_image': base64.b64encode(image_png).decode('utf-8'),
+                'palette_image': f'/media/palettes/palette_{image_instance.id}.png',
                 'rgb_codes': rgb_codes,
                 'uploaded_image_url': image_instance.image.url,
                 'k_value': k
@@ -131,32 +132,35 @@ def edit_palette(request, palette_id):
         image_instance = palette.image
         image_path = image_instance.image.path
 
-        # Görüntü işleme adımları
+        # Kaydedilmiş `k` değerini al
+        k = palette.k_value  # Veritabanından gelen `k` değeri
+
+        # Görüntü işleme
         img_resized = load_and_resize_image(image_path)
-        img_blurred = apply_gaussian_blur(img_resized)
-        img_lab = convert_to_lab(img_blurred)
-        centroids_lab = apply_kmeans(img_lab, k=5)
+        img_lab = convert_to_lab(img_resized)
+        centroids_lab = apply_kmeans(img_lab, k)
         centroids_rgb = lab_to_rgb(centroids_lab)
 
-        # Renk paletini görselleştirme
-        fig, rgb_codes = visualize_palette(centroids_rgb)
-        buffer = BytesIO()
-        FigureCanvas(fig).print_png(buffer)
-        buffer.seek(0)
-        image_png = buffer.getvalue()
-        buffer.close()
+        # Paleti görsel olarak oluştur
+        palette_image = visualize_palette(centroids_rgb)
 
-        # Güncellenmiş paleti kaydet
-        fs = FileSystemStorage()
-        palette_image_path = f'palettes/palette_{image_instance.id}_edited.png'
-        filename = fs.save(palette_image_path, BytesIO(image_png))
-        palette.palette_image = filename
+        # Görseli dosyaya kaydet
+        palette_path = f'media/palettes/palette_{image_instance.id}_edited.png'
+        cv2.imwrite(palette_path, cv2.cvtColor(palette_image, cv2.COLOR_RGB2BGR))
+
+        # Renk kodlarını oluştur
+        rgb_codes = ['#{:02x}{:02x}{:02x}'.format(int(c[0]), int(c[1]), int(c[2])) for c in centroids_rgb]
+
+        # Veritabanını güncelle
+        palette.palette_image = f'palettes/palette_{image_instance.id}_edited.png'
+        palette.rgb_codes = '|'.join(rgb_codes)
         palette.save()
 
         return render(request, 'palette.html', {
-            'palette_image': base64.b64encode(image_png).decode('utf-8'),
+            'palette_image': f'/media/palettes/palette_{image_instance.id}_edited.png',
             'rgb_codes': rgb_codes,
-            'uploaded_image_url': image_instance.image.url
+            'uploaded_image_url': image_instance.image.url,
+            'k_value': k  # `k` değerini template'e gönder
         })
     except Exception as e:
         return render(request, 'error.html', {'error': str(e)})

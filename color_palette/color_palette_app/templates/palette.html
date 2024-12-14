@@ -3,42 +3,55 @@
 {% block title %}Color Palette{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-start">
-        <!-- Renk Paleti -->
-        <div>
-            <h1>Color Palette</h1>
-            <div class="d-flex" style="border: 1px solid #ddd; padding: 10px;">
+    <!-- Top Section: Color Palette and Uploaded Image -->
+    <div class="row">
+        <!-- Color Palette -->
+        <div class="col-md-8">
+            <h1 class="mb-3">Color Palette</h1>
+            <div class="d-flex flex-wrap" style="border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
                 {% for hex_code in rgb_codes %}
                     <div 
-                        style="background-color: {{ hex_code }}; width: 100px; height: 100px; margin-right: 5px;">
+                        style="background-color: {{ hex_code }}; 
+                               width: 80px; 
+                               height: 80px; 
+                               margin: 5px; 
+                               border: 1px solid #000; 
+                               display: flex; 
+                               align-items: center; 
+                               justify-content: center; 
+                               color: #fff; 
+                               font-weight: bold;">
+                        {{ hex_code }}
                     </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Yüklenen Görüntü -->
-        <div>
-            <h1>Uploaded Image</h1>
+        <!-- Uploaded Image -->
+        <div class="col-md-4">
+            <h1 class="mb-3">Uploaded Image</h1>
             <img src="{{ uploaded_image_url }}" class="img-thumbnail" alt="Uploaded Image" 
-                style="width: 300px; height: 300px; margin-top: 25px;">
+                style="width: 100%; height: auto; max-height: 300px; object-fit: cover;">
         </div>
     </div>
 
-    <!-- RGB Kodları -->
+    <!-- RGB Codes Section -->
     <h2 class="mt-4">RGB Codes</h2>
     <ul class="list-group">
         {% for hex_code in rgb_codes %}
-            <li class="list-group-item">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
                 {{ hex_code }}
-                <button class="btn btn-sm btn-outline-secondary float-right" onclick="copyToClipboard('{{ hex_code }}')">Copy</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ hex_code }}')">Copy</button>
             </li>
         {% endfor %}
     </ul>
 
-    <!-- Ana Sayfaya Dön Butonu -->
-    <a href="{% url 'home' %}" class="btn btn-secondary mt-4">Back to Home</a>
+    <!-- Back to Home Button -->
+    <div class="mt-4">
+        <a href="{% url 'home' %}" class="btn btn-secondary">Back to Home</a>
+    </div>
 
-    <!-- Kopyalama Fonksiyonu -->
+    <!-- JavaScript: Copy to Clipboard -->
     <script>
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(function() {

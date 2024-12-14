@@ -22,6 +22,7 @@ class ColorPalette(BaseModel):
     image = models.ForeignKey(ImageUpload, on_delete=models.CASCADE)
     palette_image = models.ImageField(upload_to='palettes/')
     rgb_codes = models.TextField(blank=True)  # Renk kodlarını saklamak için alan
+    k_value = models.IntegerField(default=5) 
 
     def __str__(self):
         return f"Palette for Image {self.image.id} created by {self.user.username}"
