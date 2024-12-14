@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 from django.shortcuts import render, redirect, get_object_or_404
-from .forms import ImageUploadForm, UserRegisterForm
+from .forms import ImageUploadForm, UserRegisterForm, UserUpdateForm
 from .models import ImageUpload, ColorPalette
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm
@@ -208,3 +208,15 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
+@login_required
+def update_profile(request):
+    if request.method == 'POST':
+        form = UserUpdateForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('home')
+    else:
+        form = UserUpdateForm(instance=request.user)
+
+    return render(request, 'update_profile.html', {'form': form})

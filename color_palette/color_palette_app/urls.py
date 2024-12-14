@@ -11,4 +11,5 @@ urlpatterns = [
     path('process_image/', views.process_image, name='process_image'),
     path('delete_palette/<int:palette_id>/', views.delete_palette, name='delete_palette'),
     path('edit_palette/<int:palette_id>/', views.edit_palette, name='edit_palette'),
+    path('update_profile/', views.update_profile, name='update_profile'),
 ]
