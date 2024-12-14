@@ -3,6 +3,9 @@
 {% block title %}Error{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">An error occurred</h1>
-    <p>{{ error }}</p>
+<div class="text-center mt-5">
+    <h1>An error occurred</h1>
+    <p class="text-danger">{{ error }}</p>
+    <a href="{% url 'home' %}" class="btn btn-primary">Back to Home</a>
+</div>
 {% endblock %}

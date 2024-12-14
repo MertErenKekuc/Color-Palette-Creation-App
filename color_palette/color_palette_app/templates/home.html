@@ -3,15 +3,20 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Process an Image</h1>
-    <form method="POST" enctype="multipart/form-data" action="{% url 'process_image' %}" class="mb-4">
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-3 text-dark font-weight-bold">Process an Image</h1>
+        <p class="text-muted">Upload an image and generate a unique color palette!</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="{% url 'process_image' %}" class="bg-light p-3 shadow rounded">
         {% csrf_token %}
         <div class="form-group">
-            <label for="image">Image:</label>
-            <input type="file" id="image" name="image" class="form-control">
+            <label for="image" class="font-weight-bold">Select Image:</label>
+            <input type="file" id="image" name="image" class="form-control border-danger">
         </div>
         <div class="form-group">
-            <label for="k_value">Number of Colors (k):</label>
+            <label for="k_value" class="font-weight-bold">Number of Colors (k):</label>
             <input 
                 type="number" 
                 id="k_value" 
@@ -19,28 +24,32 @@
                 value="5" 
                 min="1" 
                 max="10" 
-                class="form-control w-25">
+                class="form-control w-50 border-danger">
         </div>
-        <button type="submit" class="btn btn-primary">Apply</button>
+        <button type="submit" class="btn btn-success btn-lg btn-block">Apply</button>
     </form>
 
-    <h2>Your Palettes</h2>
-    <div class="container">
+    <div class="mt-5">
+        <h2 class="text-secondary font-weight-bold">Your Palettes</h2>
+        <hr>
         <div class="row">
             {% for palette in palettes %}
-                <div class="col-md-4 mb-4 d-flex align-items-stretch">
-                    <div class="card" style="width: 100%; height: 100%;">
-                        <img src="{{ palette.image.image.url }}" class="card-img-top" alt="Uploaded Image" style="height: 200px; object-fit: cover;">
+                <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
+                    <div class="card shadow-sm">
+                        <img src="{{ palette.image.image.url }}" class="card-img-top" alt="Uploaded Image" style="height: 250px; object-fit: cover;">
                         <div class="card-body">
-                            <!-- Palette Colors -->
-                            <div class="d-flex mb-2">
+                            <div class="d-flex justify-content-center mb-3">
                                 {% for color in palette.rgb_colors %}
-                                    <div style="width: 30px; height: 30px; background-color: {{ color }}; margin-right: 5px; border: 1px solid #000;"></div>
+                                    <div style="width: 40px; height: 40px; background-color: {{ color }}; margin-right: 5px; border-radius: 5px; border: 1px solid #ddd;"></div>
                                 {% endfor %}
                             </div>
                             <div class="text-center">
-                                <a href="{% url 'edit_palette' palette.id %}" class="btn btn-warning">Edit</a>
-                                <a href="{% url 'delete_palette' palette.id %}" class="btn btn-danger">Delete</a>
+                                <a href="{% url 'edit_palette' palette.id %}" class="btn btn-warning btn-sm mx-2">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a href="{% url 'delete_palette' palette.id %}" class="btn btn-danger btn-sm mx-2">
+                                    <i class="fas fa-trash"></i> Delete
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -48,4 +57,5 @@
             {% endfor %}
         </div>
     </div>
+</div>
 {% endblock %}
