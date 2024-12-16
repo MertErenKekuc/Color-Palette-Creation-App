@@ -14,16 +14,16 @@ from sklearn.cluster import KMeans
 from django.core.exceptions import ValidationError
 
 # Ortak fonksiyonlar
-def load_and_resize_image(image_path, size=(200, 200)):
-    img = cv2.imread(image_path)
+def load_and_resize_image(image_path, size=(200, 200)):  # resim yükleme ve yeniden boyutlandırma fonks.
+    img = cv2.imread(image_path) # resim okuma fonksiyonu ve yolu
     if img is None:
-        raise FileNotFoundError(f"Image not found: {image_path}")
+        raise FileNotFoundError(f"Image not found: {image_path}") 
     return cv2.resize(img, size)
 
-def apply_gaussian_blur(image, kernel_size=(5, 5)):
+def apply_gaussian_blur(image, kernel_size=(5, 5)): # gaussian blur fonks. 5,5 parametresi alınmış test için değiştirilebilir
     return cv2.GaussianBlur(image, kernel_size, 0)
 
-def convert_to_lab(image):
+def convert_to_lab(image): # resimi RGB'den LAB çevirme
     return cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 
 def apply_kmeans(image, k=5):
