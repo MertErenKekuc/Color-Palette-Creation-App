@@ -12,8 +12,19 @@ from io import BytesIO
 import base64
 from sklearn.cluster import KMeans
 from django.core.exceptions import ValidationError
+from PIL import Image
+from django.core.files.base import ContentFile
 
 # Ortak fonksiyonlar
+def validate_image_format(uploaded_file):
+    try:
+        # Bellekteki dosyayı bir PIL görüntüsüne dönüştür
+        image = Image.open(uploaded_file)
+        if image.format not in ['JPEG', 'PNG']:
+            raise ValidationError('Sadece JPEG ve PNG formatındaki görseller desteklenir.')
+    except Exception:
+        raise ValidationError('Geçersiz görsel formatı.')
+
 def load_and_resize_image(image_path, size=(200, 200)):  # resim yükleme ve yeniden boyutlandırma fonks.
     img = cv2.imread(image_path) # resim okuma fonksiyonu ve yolu
     if img is None:
@@ -28,7 +39,7 @@ def convert_to_lab(image): # resimi RGB'den LAB çevirme
 
 def apply_kmeans(image, k=5):
     pixels = image.reshape((-1, 3))
-    kmeans = KMeans(n_clusters=k, random_state=42, max_iter=500)
+    kmeans = KMeans(n_clusters=k, random_state=42, max_iter=1000, n_init=10) 
     kmeans.fit(pixels)
     return kmeans.cluster_centers_
 
@@ -56,6 +67,12 @@ def save_palette_to_base64(palette_image):
     img_str = base64.b64encode(buffer).decode('utf-8')
     return img_str
 
+def save_image_to_file(image, filename):
+    # Görseli kaydetme fonksiyonu
+    output_path = os.path.join('media', filename)
+    cv2.imwrite(output_path, image)
+    return output_path
+
 def handle_error(request, error_message):
     return render(request, 'error.html', {'error': error_message})
 
@@ -82,19 +99,36 @@ def process_image(request):
             uploaded_image = request.FILES.get('image')
             if not uploaded_image:
                 return handle_error(request, 'Görsel yüklenmedi, lütfen bir görsel seçin.')
+            
+            # Görsel formatını doğrula
+            try:
+                validate_image_format(uploaded_image)
+            except ValidationError as e:
+                return handle_error(request, str(e))
 
+            # Kullanıcıdan alınan k değeri
             k = request.POST.get('k', 5)
             try:
-                k = int(k)  # Kullanıcıdan alınan `k` değeri
+                k = int(k)
             except ValueError:
                 return handle_error(request, 'Geçersiz "k" değeri. Lütfen geçerli bir sayı girin.')
 
+            # Kullanıcıdan alınan blur_kernel değeri
+            blur_kernel = request.POST.get('blur_kernel', 5)
+            try:
+                blur_kernel = int(blur_kernel)
+                if blur_kernel % 2 == 0:  # Gaussian blur için kernel tek sayı olmalı
+                    return handle_error(request, 'Blur kernel değeri tek sayı olmalıdır.')
+            except ValueError:
+                return handle_error(request, 'Geçersiz blur kernel değeri. Lütfen geçerli bir sayı girin.')
+
+            # Görüntü işleme
             image_instance = ImageUpload.objects.create(image=uploaded_image)
             image_path = image_instance.image.path
 
-            # Görüntü işleme
             img_resized = load_and_resize_image(image_path)
-            img_lab = convert_to_lab(img_resized)
+            img_blurred = apply_gaussian_blur(img_resized, (blur_kernel, blur_kernel))  # Kullanıcıdan alınan blur değeri
+            img_lab = convert_to_lab(img_blurred)
             centroids_lab = apply_kmeans(img_lab, k)
             centroids_rgb = lab_to_rgb(centroids_lab)
 
@@ -103,6 +137,10 @@ def process_image(request):
 
             # Görseli base64 formatında kaydetme
             palette_base64 = save_palette_to_base64(palette_image)
+            
+            # Gaussian Blur ve LAB uzayı görsellerini kaydet
+            blurred_image_path = save_image_to_file(img_blurred, 'blurred_image.png')
+            lab_image_path = save_image_to_file(img_lab, 'lab_image.png')
 
             # Renk kodlarını oluştur
             rgb_codes = ['#{:02x}{:02x}{:02x}'.format(int(c[0]), int(c[1]), int(c[2])) for c in centroids_rgb]
@@ -112,7 +150,7 @@ def process_image(request):
             ColorPalette.objects.create(
                 user=request.user,
                 image=image_instance,
-                palette_image=palette_base64,  # Base64 formatında kaydet
+                palette_image=palette_base64,
                 rgb_codes=rgb_code_string,
                 k_value=k
             )
@@ -121,16 +159,19 @@ def process_image(request):
                 'palette_image': palette_base64,
                 'rgb_codes': rgb_codes,
                 'uploaded_image_url': image_instance.image.url,
-                'k_value': k
+                'blurred_image_url': blurred_image_path,
+                'lab_image_url': lab_image_path,
+                'k_value': k,
+                'blur_kernel': blur_kernel  # Kullanıcıya gösterilebilir
             })
-            
+
         except FileNotFoundError:
             return handle_error(request, 'Görsel bulunamadı. Lütfen tekrar deneyin.')
         except Exception as e:
-            # Genel hata mesajı
             return handle_error(request, f'Bilinmeyen bir hata oluştu: {str(e)}')
     else:
         return redirect('home')
+
 
 @login_required
 def edit_palette(request, palette_id):
@@ -141,9 +182,16 @@ def edit_palette(request, palette_id):
         k = palette.k_value
 
         img_resized = load_and_resize_image(image_path)
+        # Blur kernel varsayımı veya kullanıcıdan alınması
+        blur_kernel = 5  # Varsayılan kernel değeri, gerekirse değiştirilir.
+        img_blurred = apply_gaussian_blur(img_resized, (blur_kernel, blur_kernel))
         img_lab = convert_to_lab(img_resized)
         centroids_lab = apply_kmeans(img_lab, k)
         centroids_rgb = lab_to_rgb(centroids_lab)
+
+        # Görselleri oluştur ve kaydet
+        blurred_image_path = save_image_to_file(img_blurred, 'blurred_image_edit.png')
+        lab_image_path = save_image_to_file(img_lab, 'lab_image_edit.png')
 
         # Paleti görsel olarak oluştur
         palette_image = visualize_palette(centroids_rgb)
@@ -162,6 +210,8 @@ def edit_palette(request, palette_id):
         return render(request, 'palette.html', {
             'palette_image': palette_base64,
             'rgb_codes': rgb_codes,
+            'blurred_image_url': blurred_image_path,
+            'lab_image_url': lab_image_path,
             'uploaded_image_url': image_instance.image.url,
             'k_value': k
         })
