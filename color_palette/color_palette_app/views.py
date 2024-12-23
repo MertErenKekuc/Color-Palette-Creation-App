@@ -1,5 +1,5 @@
 import os
-import cv2
+import cv2 # opencv'nin kütüphanesi
 import numpy as np
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import ImageUploadForm, UserRegisterForm, UserUpdateForm
@@ -15,11 +15,15 @@ from django.core.exceptions import ValidationError
 from PIL import Image
 from django.core.files.base import ContentFile
 
-# Ortak fonksiyonlar
+# Ortak kullanılan fonksiyonlar
 def validate_image_format(uploaded_file): # görsellerin formatını doğrulayan fonksiyon 
+    """
+    Yüklenen görselin formatını kontrol eder. 
+    Sadece JPEG ve PNG formatlarını kabul eder.
+    """
     try:
         image = Image.open(uploaded_file)
-        if image.format not in ['JPEG', 'PNG']: # format sadece JPEG veya PNG olabilir
+        if image.format not in ['JPEG', 'PNG']:
             raise ValidationError('Sadece JPEG ve PNG formatındaki görseller desteklenir.')
     except Exception:
         raise ValidationError('Geçersiz görsel formatı.')
@@ -30,28 +34,47 @@ def load_and_resize_image(image_path, size=(200, 200)):  # görsel yükleme ve y
         raise FileNotFoundError(f"Image not found: {image_path}") 
     return cv2.resize(img, size)
 
-def apply_gaussian_blur(image, kernel_size=(5, 5)): # gaussian blur fonks. 5,5 parametresi alınmış test için değiştirilebilir
+def apply_gaussian_blur(image, kernel_size=(5, 5)): # gaussian blur fonks. kernel 5,5 parametresi alınmış test için değiştirilebilir
     return cv2.GaussianBlur(image, kernel_size, 0)
 
-def convert_to_lab(image): # resimi RGB'den LAB çevirme
+def convert_to_lab(image): # görseli RGB'den LAB renk uzayına çevirme
     return cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 
-def apply_kmeans(image, k=5): # KMeans algoritması fonks
-    pixels = image.reshape((-1, 3)) 
-    kmeans = KMeans(n_clusters=k, random_state=42, max_iter=1000, n_init=10) 
-    kmeans.fit(pixels)
-    return kmeans.cluster_centers_
+def apply_kmeans(image, k=5):
+    """
+    Görüntüdeki baskın renkleri bulmak için KMeans algoritmasını uygular.
+    
+    Parametreler:
+    - image: İşlenecek görüntü (numpy array formatında, LAB renk uzayında olmalı).
+    - k: KMeans algoritmasında kullanılacak küme sayısı (varsayılan 5).
 
-def lab_to_rgb(centroids):
-    lab_image = np.uint8([centroids])
+    Dönüş:
+    - kmeans.cluster_centers_: Bulunan renk kümelerinin merkez koordinatları (LAB formatında).
+    """
+    pixels = image.reshape((-1, 3))  # Görüntüyü 2 boyutlu bir matris haline getir (piksel sayısı x 3 renk kanalı)
+    """KMeans algoritmasını başlat:
+        - n_clusters: k değeri, yani kaç renk kümesi oluşturulacak
+        - random_state: Tekrar edilebilirlik için sabit rastgelelik
+        - max_iter: Maksimum yineleme sayısı
+        - n_init: Algoritma farklı başlangıç noktalarıyla kaç kez çalıştırılacak
+    """
+    kmeans = KMeans(n_clusters=k, random_state=42, max_iter=1000, n_init=10) 
+    kmeans.fit(pixels) # algoritmayı pikseller üzerinde çalıştırır. 
+    return kmeans.cluster_centers_  # küme merkezlerini (baskın renkler) döndürür.
+
+def lab_to_rgb(centroids): # L(ight)AB (renk bileşenler) formatındaki renkleri RGB formatına dönüştürür. centroids: LAB formatında renk merkezleri her bir kümenin merkezini hesaplar renk değerlerinin ortalamasını temsil eder.
+    lab_image = np.uint8([centroids]) # LAB formatındaki renk merkezlerini uint8 türüne dönüştür (0-255 aralığında)
     rgb_image = cv2.cvtColor(lab_image, cv2.COLOR_LAB2RGB)
     return rgb_image[0]
 
 def visualize_palette(colors): # paleti görselleştirmek için fonksiyon
-    palette_width = 100 * len(colors)
+    palette_width = 100 * len(colors) # paletin genişliği: Her renk için 100 piksel genişlik
     palette_height = 100
-    palette_image = np.zeros((palette_height, palette_width, 3), dtype=np.uint8)
-
+    palette_image = np.zeros((palette_height, palette_width, 3), dtype=np.uint8) # siyah bir arka plan oluştur (palet boyutlarında boş bir görsel)
+    """ 
+    Aşağıdaki for döngüsü her rengi görsele ekler, rengin başladığı ve bittiği yatay pixelleri alır renk değerlerini sınırlar
+    palet görseline göre yerleştirir
+    """
     for idx, color in enumerate(colors):
         start_x = idx * 100
         end_x = start_x + 100
@@ -112,11 +135,11 @@ def process_image(request):  # görüntünün adım adım işlendiği fonksiyon
             except ValueError:
                 return handle_error(request, 'Geçersiz "k" değeri. Lütfen geçerli bir sayı girin.')
 
-            # Kullanıcıdan alınan blur_kernel değeri
+            # kullanıcıdan alınan blur_kernel değeri
             blur_kernel = request.POST.get('blur_kernel', 5)
             try:
                 blur_kernel = int(blur_kernel)
-                if blur_kernel % 2 == 0:  # Gaussian blur için kernel tek sayı olmalı
+                if blur_kernel % 2 == 0:  # gaussian blur için kernel tek sayı olmalı
                     return handle_error(request, 'Blur kernel değeri tek sayı olmalıdır.')
             except ValueError:
                 return handle_error(request, 'Geçersiz blur kernel değeri. Lütfen geçerli bir sayı girin.')
@@ -185,11 +208,11 @@ def edit_palette(request, palette_id):
         palette = get_object_or_404(ColorPalette, id=palette_id, user=request.user)
         image_instance = palette.image
         image_path = image_instance.image.path
-        k = palette.k_value
+        k = palette.k_value # daha önce belirlenen renk kümesi sayısı
 
         img_resized = load_and_resize_image(image_path)
-        # Blur kernel varsayımı veya kullanıcıdan alınması
-        blur_kernel = 5  # Varsayılan kernel değeri, gerekirse değiştirilir.
+        # blur kernel varsayımı veya kullanıcıdan alınması
+        blur_kernel = 5  # varsayılan kernel değeri, gerekirse değiştirilir.
         img_blurred = apply_gaussian_blur(img_resized, (blur_kernel, blur_kernel))
         img_lab = convert_to_lab(img_resized)
         centroids_lab = apply_kmeans(img_lab, k)
@@ -204,8 +227,8 @@ def edit_palette(request, palette_id):
         rgb_codes = ['#{:02x}{:02x}{:02x}'.format(int(c[0]), int(c[1]), int(c[2])) for c in centroids_rgb]
 
         # Veritabanını güncelle
-        palette.palette_image = palette_base64
-        palette.rgb_codes = '|'.join(rgb_codes)
+        palette.palette_image = palette_base64 # yeni renk paletini kaydeder
+        palette.rgb_codes = '|'.join(rgb_codes) # renk kodlarını string olarak kaydeder
         palette.save()
 
         """
