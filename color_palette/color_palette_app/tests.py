@@ -1,133 +1,82 @@
-#tests.py
-import os
+import json
 import time
 from django.test import TestCase
-from django.conf import settings
-from color_palette_app.views import load_and_resize_image, apply_gaussian_blur, convert_to_lab, apply_kmeans
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 
-class PerformanceTests(TestCase):
+class PerformanceTest(TestCase):
     def setUp(self):
-        """
-        Test görsellerini yükleme için setup işlemleri.
-        """
-        self.test_images_dir = os.path.join(settings.MEDIA_ROOT, 'test_images')
-        self.results = []
+        # Test kullanıcısı oluştur ve oturum aç
+        self.user = User.objects.create_user(username='testuser', password='testpassword')
+        self.client.login(username='testuser', password='testpassword')
 
-    def test_processing_time(self):
-        """
-        Görseller üzerinde işlem sürelerini ölçme testi.
-        """
-        for filename in os.listdir(self.test_images_dir):
-            image_path = os.path.join(self.test_images_dir, filename)
-            try:
-                # İşlem sürelerini ölçmek
+    def test_image_processing_with_different_inputs(self):
+        # Örnek test görselleri
+        test_images = [
+            ('test_images_small.jpg', 'media/test_images/test_images_small.jpg'),
+            ('test_images_medium.jpg', 'media/test_images/test_images_medium.jpg'),
+            ('test_images_large.jpg', 'media/test_images/test_images_large.jpg'),
+        ]
+
+        for filename, path in test_images:
+            with self.subTest(image=filename):
+                with open(path, 'rb') as img_file:
+                    uploaded_file = SimpleUploadedFile(filename, img_file.read(), content_type='image/jpeg')
+                
                 start_time = time.time()
                 
-                # Görüntüyü yükleme ve yeniden boyutlandırma
-                img_resized = load_and_resize_image(image_path)
-                load_time = time.time()
-                
-                # Gaussian Blur uygulama
-                img_blurred = apply_gaussian_blur(img_resized)
-                blur_time = time.time()
-                
-                # LAB uzayına dönüştürme
-                img_lab = convert_to_lab(img_blurred)
-                lab_time = time.time()
-                
-                # K-means uygulama
-                centroids = apply_kmeans(img_lab, k=5)
-                kmeans_time = time.time()
-
-                # Sonuçları kaydet
-                self.results.append({
-                    'image': filename,
-                    'load_time': load_time - start_time,
-                    'blur_time': blur_time - load_time,
-                    'lab_time': lab_time - blur_time,
-                    'kmeans_time': kmeans_time - lab_time,
-                    'total_time': kmeans_time - start_time
+                # Görsel işleme isteğini gönder
+                response = self.client.post('/process_image/', {
+                    'image': uploaded_file,
+                    'k': 5,
+                    'blur_kernel': 5
                 })
-            except Exception as e:
-                self.results.append({
-                    'image': filename,
-                    'error': str(e)
-                })
+                
+                end_time = time.time()
 
-        # Test sonuçlarını doğrulama
-        self.assertGreater(len(self.results), 0)
+                # Yanıt kontrolü
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('palette_image', response.context)  # Palet görseli yanıt içinde olmalı
+                print(f"{filename} işleme süresi: {end_time - start_time} saniye")
 
-    def tearDown(self):
-        """
-        Sonuçları dosyaya yazma.
-        """
-        with open('performance_results.csv', 'w') as f:
-            f.write('image,load_time,blur_time,lab_time,kmeans_time,total_time\n')
-            for result in self.results:
-                if 'error' in result:
-                    f.write(f"{result['image']},ERROR: {result['error']}\n")
-                else:
-                    f.write(f"{result['image']},{result['load_time']},{result['blur_time']},{result['lab_time']},{result['kmeans_time']},{result['total_time']}\n")
-                    
-class ParameterTests(TestCase):
-    def setUp(self):
-        """
-        Test görsellerini yükleme için setup işlemleri.
-        """
-        self.test_images_dir = os.path.join(settings.MEDIA_ROOT, 'test_images')
-        self.results = []
+    def test_parametre_anlayisi(self):
+        # Yeni parametre testi
+        test_images = [
+            ('test_images_small.jpg', 'media/test_images/test_images_small.jpg'),
+        ]
+        k_values = [2, 5, 10, 15, 20]
+        blur_kernels = [3, 5, 7, 15, 25, 45]
 
-    def test_parameter_variations(self):
-        """
-        Farklı parametre değerleri ile test yapma.
-        """
-        for k in [3, 5, 7]:  # Farklı K-means k değerleri
-            for kernel_size in [(3, 3), (5, 5), (7, 7)]:  # Farklı Gaussian Blur kernel boyutları
-                for filename in os.listdir(self.test_images_dir):
-                    image_path = os.path.join(self.test_images_dir, filename)
-                    try:
+        test_results = []
+
+        for filename, path in test_images:
+            for k in k_values:
+                for blur_kernel in blur_kernels:
+                    with self.subTest(image=filename, k=k, blur_kernel=blur_kernel):
+                        with open(path, 'rb') as img_file:
+                            uploaded_file = SimpleUploadedFile(filename, img_file.read(), content_type='image/jpeg')
+                        
                         start_time = time.time()
                         
-                        # Görüntüyü yükleme ve yeniden boyutlandırma
-                        img_resized = load_and_resize_image(image_path)
+                        # Görsel işleme isteğini gönder
+                        response = self.client.post('/process_image/', {
+                            'image': uploaded_file,
+                            'k': k,
+                            'blur_kernel': blur_kernel
+                        })
                         
-                        # Gaussian Blur uygulama
-                        img_blurred = apply_gaussian_blur(img_resized, kernel_size=kernel_size)
-                        
-                        # LAB uzayına dönüştürme
-                        img_lab = convert_to_lab(img_blurred)
-                        
-                        # K-means uygulama
-                        centroids = apply_kmeans(img_lab, k=k)
                         end_time = time.time()
 
-                        # Sonuçları kaydet
-                        self.results.append({
+                        self.assertEqual(response.status_code, 200)
+                        self.assertIn('palette_image', response.context)
+                        
+                        test_results.append({
                             'image': filename,
-                            'k': k,
-                            'kernel_size': kernel_size,
-                            'total_time': end_time - start_time,
-                            'centroids': centroids.tolist()
+                            'k_value': k,
+                            'blur_kernel': blur_kernel,
+                            'processing_time': end_time - start_time
                         })
-                    except Exception as e:
-                        self.results.append({
-                            'image': filename,
-                            'k': k,
-                            'kernel_size': kernel_size,
-                            'error': str(e)
-                        })
+                        print(f"{filename} - k: {k}, blur_kernel: {blur_kernel}, İşleme süresi: {end_time - start_time}")
 
-        # Sonuçların doğru olduğunu kontrol et
-        self.assertGreater(len(self.results), 0)
-
-    def tearDown(self):
-        """
-        Sonuçları CSV'ye yazma.
-        """
-        with open('parameter_results.csv', 'w') as f:
-            f.write('image,k,kernel_size,total_time\n')
-            for result in self.results:
-                if 'error' in result:
-                    f.write(f"{result['image']},{result['k']},{result['kernel_size']},ERROR: {result['error']}\n")
-                else:
-                    f.write(f"{result['image']},{result['k']},{result['kernel_size']},{result['total_time']}\n")
+        with open('parametre_test_results.json', 'w') as file:
+            json.dump(test_results, file)

@@ -16,11 +16,11 @@ from PIL import Image
 from django.core.files.base import ContentFile
 
 # Ortak fonksiyonlar
-def validate_image_format(uploaded_file):
+def validate_image_format(uploaded_file): # görsellerin formatını doğrulayan fonksiyon 
     try:
         # Bellekteki dosyayı bir PIL görüntüsüne dönüştür
         image = Image.open(uploaded_file)
-        if image.format not in ['JPEG', 'PNG']:
+        if image.format not in ['JPEG', 'PNG']: # format sadece JPEG veya PNG olabilir
             raise ValidationError('Sadece JPEG ve PNG formatındaki görseller desteklenir.')
     except Exception:
         raise ValidationError('Geçersiz görsel formatı.')
@@ -37,8 +37,8 @@ def apply_gaussian_blur(image, kernel_size=(5, 5)): # gaussian blur fonks. 5,5 p
 def convert_to_lab(image): # resimi RGB'den LAB çevirme
     return cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
 
-def apply_kmeans(image, k=5):
-    pixels = image.reshape((-1, 3))
+def apply_kmeans(image, k=5): # KMeans algoritması fonks
+    pixels = image.reshape((-1, 3)) 
     kmeans = KMeans(n_clusters=k, random_state=42, max_iter=1000, n_init=10) 
     kmeans.fit(pixels)
     return kmeans.cluster_centers_
@@ -48,7 +48,7 @@ def lab_to_rgb(centroids):
     rgb_image = cv2.cvtColor(lab_image, cv2.COLOR_LAB2RGB)
     return rgb_image[0]
 
-def visualize_palette(colors):
+def visualize_palette(colors): # paleti görselleştirmek için fonksiyon
     palette_width = 100 * len(colors)
     palette_height = 100
     palette_image = np.zeros((palette_height, palette_width, 3), dtype=np.uint8)
@@ -73,10 +73,10 @@ def save_image_to_file(image, filename):
     cv2.imwrite(output_path, image)
     return output_path
 
-def handle_error(request, error_message):
+def handle_error(request, error_message): # hataları döndürmek için kullanılan fonksiyon
     return render(request, 'error.html', {'error': error_message})
 
-@login_required
+@login_required 
 def home(request):
     if request.method == 'POST':
         form = ImageUploadForm(request.POST, request.FILES)
@@ -93,7 +93,7 @@ def home(request):
     return render(request, 'home.html', {'form': form, 'palettes': palettes})
 
 @login_required
-def process_image(request):
+def process_image(request):  # görüntünün adım adım işlendiği fonksiyon
     if request.method == 'POST':
         try:
             uploaded_image = request.FILES.get('image')
@@ -126,7 +126,7 @@ def process_image(request):
             image_instance = ImageUpload.objects.create(image=uploaded_image)
             image_path = image_instance.image.path
 
-            img_resized = load_and_resize_image(image_path)
+            img_resized = load_and_resize_image(image_path) # yeniden boyutlandırma
             img_blurred = apply_gaussian_blur(img_resized, (blur_kernel, blur_kernel))  # Kullanıcıdan alınan blur değeri
             img_lab = convert_to_lab(img_blurred)
             centroids_lab = apply_kmeans(img_lab, k)
