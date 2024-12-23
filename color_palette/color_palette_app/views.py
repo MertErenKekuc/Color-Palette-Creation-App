@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from io import BytesIO
 import base64
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans # KMeans algoritması için kullanılan kütüphane
 from django.core.exceptions import ValidationError
 from PIL import Image
 from django.core.files.base import ContentFile
@@ -18,15 +18,14 @@ from django.core.files.base import ContentFile
 # Ortak fonksiyonlar
 def validate_image_format(uploaded_file): # görsellerin formatını doğrulayan fonksiyon 
     try:
-        # Bellekteki dosyayı bir PIL görüntüsüne dönüştür
         image = Image.open(uploaded_file)
         if image.format not in ['JPEG', 'PNG']: # format sadece JPEG veya PNG olabilir
             raise ValidationError('Sadece JPEG ve PNG formatındaki görseller desteklenir.')
     except Exception:
         raise ValidationError('Geçersiz görsel formatı.')
 
-def load_and_resize_image(image_path, size=(200, 200)):  # resim yükleme ve yeniden boyutlandırma fonks.
-    img = cv2.imread(image_path) # resim okuma fonksiyonu ve yolu
+def load_and_resize_image(image_path, size=(200, 200)):  # görsel yükleme ve yeniden boyutlandırma fonks.
+    img = cv2.imread(image_path) # görsel okuma fonksiyonu ve yolu
     if img is None:
         raise FileNotFoundError(f"Image not found: {image_path}") 
     return cv2.resize(img, size)
@@ -128,9 +127,9 @@ def process_image(request):  # görüntünün adım adım işlendiği fonksiyon
 
             img_resized = load_and_resize_image(image_path) # yeniden boyutlandırma
             img_blurred = apply_gaussian_blur(img_resized, (blur_kernel, blur_kernel))  # Kullanıcıdan alınan blur değeri
-            img_lab = convert_to_lab(img_blurred)
-            centroids_lab = apply_kmeans(img_lab, k)
-            centroids_rgb = lab_to_rgb(centroids_lab)
+            img_lab = convert_to_lab(img_blurred) # görüntü LAB formatına çevirme
+            centroids_lab = apply_kmeans(img_lab, k) # LAB'a çevirilen görüntüye KMeans algoritması uygulama
+            centroids_rgb = lab_to_rgb(centroids_lab) # LAB türünde olan görüntüyü RGB formatına çevirme.
 
             # Paleti görsel olarak oluştur
             palette_image = visualize_palette(centroids_rgb)
@@ -146,9 +145,16 @@ def process_image(request):  # görüntünün adım adım işlendiği fonksiyon
             rgb_codes = ['#{:02x}{:02x}{:02x}'.format(int(c[0]), int(c[1]), int(c[2])) for c in centroids_rgb]
             rgb_code_string = '|'.join(rgb_codes)
 
-            # Veritabanına kaydet
+            """ 
+            Veritabanına kaydetme işlemleri
+            kullanıcı,
+            görsel,
+            paletin görseli,
+            rgb kodunu string şeklinde
+            k değerini
+            """
             ColorPalette.objects.create(
-                user=request.user,
+                user=request.user, 
                 image=image_instance,
                 palette_image=palette_base64,
                 rgb_codes=rgb_code_string,
@@ -162,7 +168,7 @@ def process_image(request):  # görüntünün adım adım işlendiği fonksiyon
                 'blurred_image_url': blurred_image_path,
                 'lab_image_url': lab_image_path,
                 'k_value': k,
-                'blur_kernel': blur_kernel  # Kullanıcıya gösterilebilir
+                'blur_kernel': blur_kernel
             })
 
         except FileNotFoundError:
@@ -188,17 +194,12 @@ def edit_palette(request, palette_id):
         img_lab = convert_to_lab(img_resized)
         centroids_lab = apply_kmeans(img_lab, k)
         centroids_rgb = lab_to_rgb(centroids_lab)
-
-        # Görselleri oluştur ve kaydet
-        blurred_image_path = save_image_to_file(img_blurred, 'blurred_image_edit.png')
-        lab_image_path = save_image_to_file(img_lab, 'lab_image_edit.png')
-
+        blurred_image_path = save_image_to_file(img_blurred, 'blurred_image_edit.png') # Blurlanmış görselleri oluştur ve kaydet.
+        lab_image_path = save_image_to_file(img_lab, 'lab_image_edit.png') # Lab görselleri kaydetme.
         # Paleti görsel olarak oluştur
         palette_image = visualize_palette(centroids_rgb)
-
         # Görseli base64 formatında kaydetme
         palette_base64 = save_palette_to_base64(palette_image)
-
         # Renk kodlarını oluştur
         rgb_codes = ['#{:02x}{:02x}{:02x}'.format(int(c[0]), int(c[1]), int(c[2])) for c in centroids_rgb]
 
@@ -207,6 +208,10 @@ def edit_palette(request, palette_id):
         palette.rgb_codes = '|'.join(rgb_codes)
         palette.save()
 
+        """
+        Test için kullanılan yönlendirme
+        return redirect('home')  # Burada 'home', yönlendirme yapılacak URL'nin adı.
+        """
         return render(request, 'palette.html', {
             'palette_image': palette_base64,
             'rgb_codes': rgb_codes,
